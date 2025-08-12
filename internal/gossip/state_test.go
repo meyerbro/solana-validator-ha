@@ -4,16 +4,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/sol-strategies/solana-validator-ha/internal/config"
 	"github.com/sol-strategies/solana-validator-ha/internal/rpc"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewState(t *testing.T) {
 	// Create a real RPC client for this test since we're not testing RPC functionality
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -35,7 +35,7 @@ func TestNewState(t *testing.T) {
 
 func TestHasIP(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -61,7 +61,7 @@ func TestHasIP(t *testing.T) {
 
 func TestHasActivePeer(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -92,7 +92,7 @@ func TestHasActivePeer(t *testing.T) {
 
 func TestHasActivePeerInTheLast(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -128,7 +128,7 @@ func TestHasActivePeerInTheLast(t *testing.T) {
 	}
 
 	assert.True(t, state.HasActivePeerInTheLast(time.Minute)) // peer2 is still recent
-	
+
 	// Test with a very short duration that should fail
 	// We'll use a negative duration to ensure it fails
 	assert.False(t, state.HasActivePeerInTheLast(-time.Second))
@@ -136,7 +136,7 @@ func TestHasActivePeerInTheLast(t *testing.T) {
 
 func TestGetActivePeer(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -147,7 +147,7 @@ func TestGetActivePeer(t *testing.T) {
 	state := NewState(opts)
 
 	// Test with no active peers
-	_, _, err := state.GetActivePeer()
+	_, err := state.GetActivePeer()
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no active peer found")
 
@@ -160,9 +160,8 @@ func TestGetActivePeer(t *testing.T) {
 	}
 	state.peerStatesByName["peer1"] = activePeer
 
-	name, peerState, err := state.GetActivePeer()
+	peerState, err := state.GetActivePeer()
 	assert.NoError(t, err)
-	assert.Equal(t, "peer1", name)
 	assert.Equal(t, activePeer.IP, peerState.IP)
 	assert.Equal(t, activePeer.Pubkey, peerState.Pubkey)
 	assert.True(t, peerState.LastSeenActive)
@@ -170,7 +169,7 @@ func TestGetActivePeer(t *testing.T) {
 
 func TestHasPeers(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -204,7 +203,7 @@ func TestHasPeers(t *testing.T) {
 
 func TestGetPeerStates(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -246,7 +245,7 @@ func TestRefresh_WithRPCError(t *testing.T) {
 	// Test that Refresh handles RPC errors gracefully
 	// We'll use a real RPC client but with an invalid URL to simulate failure
 	invalidRPC := rpc.NewClient("https://invalid-url-that-will-fail.com")
-	
+
 	opts := Options{
 		ClusterRPC:   invalidRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -257,7 +256,7 @@ func TestRefresh_WithRPCError(t *testing.T) {
 	}
 
 	state := NewState(opts)
-	
+
 	// Initially populate with some data
 	state.peerStatesByName = map[string]PeerState{
 		"peer1": {IP: "192.168.1.2", Pubkey: "pubkey1", LastSeenAtUTC: time.Now().UTC(), LastSeenActive: false},
@@ -275,7 +274,7 @@ func TestRefresh_WithValidRPC(t *testing.T) {
 	// Test Refresh with a valid RPC client
 	// This test may fail if the RPC endpoint is not available, but that's expected
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "peNgUgnzs1jGogUPW8SThXMvzNpzKSNf3om78xVPAYx", // This matches the hardcoded active pubkey in the code
@@ -286,20 +285,20 @@ func TestRefresh_WithValidRPC(t *testing.T) {
 	}
 
 	state := NewState(opts)
-	
+
 	// Refresh the state
 	state.Refresh()
 
 	// Verify the state was updated (timestamp should be set)
 	assert.False(t, state.PeerStatesRefreshedAt.IsZero())
-	
+
 	// The actual peer states will depend on the RPC response, but we can verify the method completed
 	// without panicking and updated the timestamp
 }
 
 func TestState_EdgeCases(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -317,17 +316,16 @@ func TestState_EdgeCases(t *testing.T) {
 
 	// Should find at least one active peer
 	assert.True(t, state.HasActivePeer())
-	
+
 	// GetActivePeer should return the first one it finds
-	name, peerState, err := state.GetActivePeer()
+	peerState, err := state.GetActivePeer()
 	assert.NoError(t, err)
-	assert.NotEmpty(t, name)
 	assert.True(t, peerState.LastSeenActive)
 }
 
 func TestState_EmptyConfigPeers(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -342,17 +340,17 @@ func TestState_EmptyConfigPeers(t *testing.T) {
 	assert.False(t, state.HasActivePeerInTheLast(time.Minute))
 	assert.False(t, state.HasIP("192.168.1.1"))
 	assert.False(t, state.HasPeers("192.168.1.1"))
-	
-	_, _, err := state.GetActivePeer()
+
+	_, err := state.GetActivePeer()
 	assert.Error(t, err)
-	
+
 	peerStates := state.GetPeerStates()
 	assert.Empty(t, peerStates)
 }
 
 func TestState_TimeBasedLogic(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -375,10 +373,10 @@ func TestState_TimeBasedLogic(t *testing.T) {
 
 	// Should be active within 1 minute
 	assert.True(t, state.HasActivePeerInTheLast(time.Minute))
-	
+
 	// Should be active within 1 hour
 	assert.True(t, state.HasActivePeerInTheLast(time.Hour))
-	
+
 	// Test with a very short duration that should fail
 	// We'll use a negative duration to ensure it fails
 	assert.False(t, state.HasActivePeerInTheLast(-time.Second))
@@ -386,7 +384,7 @@ func TestState_TimeBasedLogic(t *testing.T) {
 
 func TestState_ConcurrentAccess(t *testing.T) {
 	realRPC := rpc.NewClient("https://api.mainnet-beta.solana.com")
-	
+
 	opts := Options{
 		ClusterRPC:   realRPC,
 		ActivePubkey: "test-active-pubkey",
@@ -399,7 +397,7 @@ func TestState_ConcurrentAccess(t *testing.T) {
 	// Test concurrent access to state methods
 	// This is mainly to ensure the methods are thread-safe
 	done := make(chan bool, 10)
-	
+
 	for i := 0; i < 10; i++ {
 		go func() {
 			state.HasActivePeer()
@@ -409,12 +407,12 @@ func TestState_ConcurrentAccess(t *testing.T) {
 			done <- true
 		}()
 	}
-	
+
 	// Wait for all goroutines to complete
 	for i := 0; i < 10; i++ {
 		<-done
 	}
-	
+
 	// If we get here without panicking, the methods are thread-safe
 	assert.True(t, true)
 }
