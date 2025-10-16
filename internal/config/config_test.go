@@ -77,6 +77,10 @@ func TestSetDefaults(t *testing.T) {
 func TestValidate(t *testing.T) {
 	// Test with valid config (without identities to avoid loading files)
 	cfg := &Config{
+		Log: Log{
+			Level:  "info",
+			Format: "text",
+		},
 		Validator: Validator{
 			Name:   "test-validator",
 			RPCURL: "http://localhost:8899",
