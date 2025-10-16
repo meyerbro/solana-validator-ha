@@ -70,7 +70,7 @@ This approach safeguards against network disconnection or dead nodes, ensuring a
        passive:
          command: "seppukku.sh" # user-supplied command -everyone's setup is different :-)
          args: [
-           "--passive-identity-file", "{{ .Identities.PassiveKeypairFile }}",
+           "--passive-identity-file", "{{ .PassiveIdentityKeypairFile }}",
          ]
       #...
    ```
