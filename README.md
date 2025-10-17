@@ -443,7 +443,7 @@ air             # Start with hot reloading
 
 For Docker-based development with hot reloading:
 ```bash
-make dev        # Start development environment with hot reload
+make dev        # Start development environment with hot reload (metrics on :9090)
 make dev-stop   # Stop development environment
 ```
 

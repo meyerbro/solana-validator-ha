@@ -18,7 +18,7 @@ COPY . .
 COPY .air.toml ./
 
 # Expose port
-EXPOSE 8080
+EXPOSE 9090
 
 # Start with air for hot reload
 CMD ["air", "-c", "/app/.air.toml"]
