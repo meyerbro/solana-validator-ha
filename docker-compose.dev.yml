@@ -11,4 +11,4 @@ services:
     environment:
       - GO_ENV=development
     command: ["air", "-c", "/app/.air.toml"]
-    restart: unless-stopped 
+    restart: unless-stopped
