@@ -82,10 +82,8 @@ vendor/
 
 # Temporary files
 tmp/
-temp/ 
+temp/
 
 # Integration test files
 local-test-files/
 integration/test-files/
-
-solana-validator-ha
