@@ -4,53 +4,40 @@ A gossip-based high availability (HA) manager for Solana validators.
 
 ## Demo
 
-A simulated automatic HA failover resulting from `validator-1 (active)` disconnecting from the network given the validator set `[validator-1 (active), validator-2 (passive), validator-3 (passive)]`:
+Automatic failover resulting from loss of `active (voting)` leader.
 
-**validator-1** - disconnects, becomes `passive`, and `validator-3` becomes `active`
+**`primary (active)`** disconnects and is ensured to be `passive`
 
-![demo-validator-1](demo/validator-1/demo.gif)
+![primary-lost](demo/e2e/primary.gif)
 
-**validator-2** - detects `validator-1` disconnection, sees `validator-3` take over as `active`
+**`backup`** detects loss of leader and becomes `active`
 
-![demo-validator-2](demo/validator-2/demo.gif)
-
-**validator-3** - detects `validator-1` disconnection, takes over as `active`
-
-![demo-validator-3](demo/validator-3/demo.gif)
+![backup-active](demo/e2e/backup.gif)
 
 ## Features
 
 - **🔍 Intelligent Peer Detection**: Automatically detects validator roles based on network gossip and RPC identity
 - **🛡️ Self-Healing**: Validators transition between active/passive roles based on health and network visibility
-- **🔗 Hook System**: Comprehensive pre/post hooks with `must_succeed` support for role transitions
-- **📝 Template Support**: Commands and hooks support Go template variables
-- **🧪 Dry Run Mode**: Test failover logic without executing actual commands
+- **🪝 Hooks**: Pre/Post failover hook support for role transitions
 - **📊 Prometheus Metrics**: Rich metrics collection for monitoring and alerting
-- **🌐 Multi-RPC Support**: Multiple cluster RPC URLs for redundancy and load distribution
-- **⚡ Throttling Protection**: Smart RPC client load balancing to avoid rate limits
-- **🏁 First-Responder Failover**: Race-based failover where fastest healthy passive validator assumes active role when no active validator found in gossip
-- **🔧 Integration Testing**: Comprehensive Docker-based integration test suite
-
-## Architecture
-
-The system consists of several key components:
-
-- **🎯 HA Manager**: Core logic for monitoring peers and making failover decisions
-- **🌐 Gossip Monitor**: Interfaces with Solana gossip network to track validator states
-- **📡 RPC Client**: Multi-endpoint RPC client with intelligent failover and throttling protection
-- **📊 Prometheus Metrics**: Comprehensive metrics collection and HTTP endpoint
-- **⚙️ Configuration**: YAML-based configuration with validation and templating support
-- **🧪 Integration Tests**: Docker Compose-based testing with mock Solana network
+- **🏁 First-Responder Failover**: Race-based failover where fastest healthy, passive validator assumes active role when the cluster is leaderless
 
 ### Conceptual overview
 
-`solana-validator-ha` aims to provide a simple, low-dependency HA solution to running 2 or more related validators on a Solana cluster where one of these should be an `active (voting)` peer with the others remaining `passive (non-voting)`. The set of validators each have a unique `passive` identity and a shared `active` identity. The program discovers its HA peers using the Solana cluster's set of validators and each peer makes independent failover decisions when no active peer is discovered.
+`solana-validator-ha` aims to provide a simple, low-dependency HA solution to running 2 or more related validators where one of these should be an `active (voting)` leader with the others remaining `passive (non-voting)`. The set of validators each have a unique `passive` identity and a shared `active` identity. The program discovers validators' HA peers using the existing gossip protocol and each peer makes independent failover decisions when no active peer is discovered.
 
-This approach safeguards against network disconnection or dead nodes, ensuring an `active` validator from the peer list is always online. To this end two (‼️**very**‼️) important user-supplied configuration settings are required:
+To give the best chance of success when things turn to 💩 two (‼️**VERY**‼️) important user-supplied configuration settings are required:
 
-1. A command to run for a node to assume the `active` role. This is simply a reference to a user-supplied command that will be called on the current node only if a failover is required, the node is healthy, is discoverable on the Solana cluster, is responding on its gossip port, and no other peers have already assumed the `active` role. As such it should not return until it has successfully set and confirmed the node is active. Typically this would be something along the lines of:
+#### 1. 🟢 Active command
+
+A command to run for a node to assume the `active` role. This is simply a reference to a user-supplied command that will be called on the current node when a failover is required and:
+
+  1. The node is healthy (so that it can take over as leader);
+  1. The node is discoverable and reachable on its gossip-advertised port; and
+  3. No other peers have already assumed the `active` role. 
    
    ```yaml
+      # solana-validator-ha-config.yaml
       #...
       failover:
        active:
@@ -62,28 +49,31 @@ This approach safeguards against network disconnection or dead nodes, ensuring a
       #...
    ```
 
-2. A command to run to assume a `passive` role (a.k.a _Seppukku_). This is simply a reference to an **idempotent** user-supplied command that ensures the validator is set to `passive`. An `active` validator that detects itself as disconnected from the Solana network will call this independently to ensure it doesn't come back online as `active` and cause duplicate identity atempts. Operators may find it safest to configure validators to always start with a `passive` identity so that this would simply require restarting the validator service and waiting for it to report healthy. Something along the lines of:
+#### 2. 🔴 Passive command
+
+A command to run to assume a `passive` role (a.k.a _Seppukku_). This is simply a reference to an **idempotent** user-supplied command that ensures the validator is set to `passive`. An validator that detects itself as disconnected from the Solana network will call this command to ensure it is `passive`. Operators may find it safest to configure validators to always start with a `passive` identity so that this command simply restarts the validator service and waits for it to report healthy. Something along the lines of:
 
    ```yaml
       #...
       failover:
        passive:
-         command: "seppukku.sh" # user-supplied command -everyone's setup is different :-)
+         # ⚠️ Everyone's setup is different, but this command should make damn sure the validator goes passive.
+         # ⚠️ If set-identity fails, restart/stop the validator service, or pull the plug, or call your mum crying for help.
+         # ⚠️ Do whatever you need to ensure this validator doesn't come back as active
+         command: "seppukku.sh" # user-supplied command
          args: [
            "--passive-identity-file", "{{ .PassiveIdentityKeypairFile }}",
          ]
       #...
    ```
 
-## Quick Start
+## Installation
 
-### Build/Development Prerequisites
+### Download binary
 
-- **Go 1.24 or later**
-- **Docker** (optional, for containerized deployment/development)
+Download and install the latest [release](https://github.com/SOL-Strategies/solana-validator-ha/releases) binary for your system.
 
-### Installation
-
+### From source
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/sol-strategies/solana-validator-ha.git
@@ -401,83 +391,12 @@ failover:
 
 ```
 
-## Development
+## Development and testing
 
-### Available Commands
 ```bash
-# Building
-make build                # Build for development (current platform)
-make build-all            # Build for all release platforms
-make clean                # Clean build artifacts
-
-# Testing
-make test                 # Run unit tests
-make test-coverage        # Run tests with coverage report
-make integration-test     # Run Docker-based integration tests
-
-# Development
-make dev                  # Start development environment (Docker)
-make dev-setup            # Setup local development with hot reload
-make fmt                  # Format code
-make lint                 # Run linter
-
-# Docker
-make docker-build         # Build Docker image
-make docker-run           # Run Docker container
-
-# Installation
-make install              # Install binary to /usr/local/bin
-make uninstall            # Remove installed binary
-```
-
-### Development Environment
-
-For local development with hot reloading:
-```bash
-make dev-setup  # Install air for hot reloading
-air             # Start with hot reloading
-```
-
-For Docker-based development with hot reloading:
-```bash
-make dev        # Start development environment with hot reload (metrics on :9090)
-make dev-stop   # Stop development environment
-```
-
-## Testing
-
-### Unit Tests
-```bash
-# Run all tests
+make dev
 make test
-
-# Run tests with coverage
-make test-coverage
-
-# Run specific package tests
-go test ./internal/config -v
-
-# Test with debug mode
-TEST_MODE=true go test ./...
 ```
-
-### Integration Tests
-
-The project includes comprehensive Docker-based integration tests:
-
-```bash
-# Run integration tests
-make integration-test
-
-# Or directly
-cd integration && ./run-tests.sh
-```
-
-**Test Scenarios:**
-1. **Stable Operation**: One active + two passive peers (no failover)
-2. **Active Failover**: Active peer disconnects, passive takes over
-3. **Race Condition**: Multiple passive peers compete (first responder wins)
-4. **Health Validation**: Unhealthy peers don't become active
 
 ## Monitoring & Metrics
 
@@ -499,121 +418,6 @@ The application exposes Prometheus metrics on the configured port (default: 9090
 ### Health Endpoints
 - **`/metrics`**: Prometheus metrics
 - **`/health`**: Basic health check
-
-## Failover Logic
-
-The system uses a **first-responder wins** approach:
-
-1. **🔍 Continuous Monitoring**: Poll Solana gossip every `failover.poll_interval_duration`
-2. **⚠️ Leaderless Detection**: Trigger if no active peer found for `failover.leaderless_threshold_duration`
-3. **🏃 Race Condition**: First healthy passive validator to detect leaderless state wins
-4. **⏱️ Takeover Delay**: Brief delay + jitter to reduce collision probability
-5. **✅ Health Validation**: Only healthy validators in gossip can become active
-
-## Docker Deployment
-
-### Production Deployment
-```bash
-# Build production image
-make docker-build
-
-# Run with custom config
-docker run -d \
-  --name solana-ha \
-  -p 9090:9090 \
-  -v /path/to/config.yaml:/app/config.yaml \
-  -v /path/to/keypairs:/app/keypairs \
-  solana-validator-ha:latest run --config /app/config.yaml
-```
-
-### Docker Compose
-```yaml
-version: '3.8'
-services:
-  solana-ha:
-    build: .
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./config.yaml:/app/config.yaml
-      - ./keypairs:/app/keypairs
-    command: ["run", "--config", "/app/config.yaml"]
-```
-
-## Building for Release
-
-### Automated Releases
-The project includes GitHub Actions for automated releases:
-1. Create a semantic version tag (e.g., `v1.0.0`)
-2. GitHub Actions automatically builds for all platforms using Go 1.25
-3. Generates compressed binaries with checksums and creates release
-
-### Manual Build
-```bash
-# Build for current platform
-make build
-
-# Build for all platforms (with compression and checksums)
-make build-all
-
-# Clean build artifacts
-make clean
-```
-
-**Supported Platforms:**
-- Linux (amd64, arm64)
-- macOS (amd64, arm64)
-
-**Release Process:**
-1. Tag your commit: `git tag v1.0.0`
-2. Push the tag: `git push origin v1.0.0`
-3. GitHub Actions will automatically build and create a release
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Validator not appearing in gossip**
-   - Check network connectivity
-   - Verify public IP detection
-   - Ensure Solana validator is running
-
-2. **RPC connection failures**
-   - Verify `rpc_url` is accessible
-   - Check if multiple `rpc_urls` help with redundancy
-   - Monitor rate limiting with multiple URLs
-
-3. **Failover not triggering**
-   - Check `leaderless_threshold_duration` setting
-   - Verify peer configuration
-   - Enable debug logging
-
-### Debug Mode
-```bash
-# Enable debug logging
-LOG_LEVEL=debug ./bin/solana-validator-ha run --config config.yaml
-
-# Use dry run mode
-# Set dry_run: true in config.yaml
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Make your changes
-4. Add tests for new functionality
-5. Run tests: `make test`
-6. Run integration tests: `make integration-test`
-7. Format code: `make fmt`
-8. Submit a pull request
-
-### Development Guidelines
-- Follow Go conventions and use `gofmt`
-- Add unit tests for new functionality
-- Update integration tests for behavioral changes
-- Document configuration changes
-- Use semantic versioning for releases
 
 ## License
 
